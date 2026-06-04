@@ -1,230 +1,443 @@
 import pygame
 import os
 import random
+import sys
 
-TELA_LARGURA = 500
-TELA_ALTURA = 800
 
-IMAGEM_CANO = pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'pipe.png')))
-IMAGEM_CHAO = pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'base.png')))
-IMAGEM_BACKGROUND = pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'bg.png')))
-IMAGENS_PASSARO = [
-    pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'bird1.png'))),
-    pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'bird2.png'))),
-    pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'bird3.png'))),
+def resource_path(relative_path):
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, relative_path)
+
+
+def get_save_path(filename):
+    if getattr(sys, 'frozen', False):
+        base_path = os.path.dirname(sys.executable)
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, filename)
+
+pygame.init()
+try:
+    pygame.mixer.init()
+except Exception:
+    pass
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+IMG_DIR = os.path.join(BASE_DIR, 'imgs')
+HIGH_SCORE_FILE = get_save_path('highscore.txt')
+MENU_MUSIC_FILE = resource_path('backgroundmusicforvideos-gaming-game-minecraft-background-music-372242.mp3')
+GAME_MUSIC_FILE = resource_path('tatamusic-game-gaming-minecraft-background-music-377647.mp3')
+
+SCREEN_WIDTH = 500
+SCREEN_HEIGHT = 800
+
+PIPE_IMAGE = pygame.transform.scale2x(pygame.image.load(resource_path(os.path.join('imgs', 'pipe.png'))))
+GROUND_IMAGE = pygame.transform.scale2x(pygame.image.load(resource_path(os.path.join('imgs', 'base.png'))))
+BACKGROUND_IMAGE = pygame.transform.scale2x(pygame.image.load(resource_path(os.path.join('imgs', 'bg.png'))))
+BIRD_IMAGES = [
+    pygame.transform.scale2x(pygame.image.load(resource_path(os.path.join('imgs', 'bird1.png')))),
+    pygame.transform.scale2x(pygame.image.load(resource_path(os.path.join('imgs', 'bird2.png')))),
+    pygame.transform.scale2x(pygame.image.load(resource_path(os.path.join('imgs', 'bird3.png')))),
 ]
 
 pygame.font.init()
-FONTE_PONTOS = pygame.font.SysFont('arial', 50)
+SCORE_FONT = pygame.font.SysFont('arial', 50)
+MENU_FONT = pygame.font.SysFont('arial', 40)
 
 
-class Passaro:
-    IMGS = IMAGENS_PASSARO
-    # animações da rotação
-    ROTACAO_MAXIMA = 25
-    VELOCIDADE_ROTACAO = 20
-    TEMPO_ANIMACAO = 5
+class Bird:
+    IMGS = BIRD_IMAGES
+    # rotation animation
+    MAX_ROTATION = 25
+    ROTATION_VELOCITY = 20
+    ANIMATION_TIME = 5
 
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.angulo = 0
-        self.velocidade = 0
-        self.altura = self.y
-        self.tempo = 0
-        self.contagem_imagem = 0
-        self.imagem = self.IMGS[0]
+        self.angle = 0
+        self.velocity = 0
+        self.height = self.y
+        self.time = 0
+        self.image_count = 0
+        self.image = self.IMGS[0]
 
-    def pular(self):
-        self.velocidade = -10.5
-        self.tempo = 0
-        self.altura = self.y
+    def jump(self):
+        self.velocity = -10.5
+        self.time = 0
+        self.height = self.y
 
-    def mover(self):
-        # calcular o deslocamento
-        self.tempo += 1
-        deslocamento = 1.5 * (self.tempo**2) + self.velocidade * self.tempo
+    def move(self):
+        # calculate displacement
+        self.time += 1
+        displacement = 1.5 * (self.time**2) + self.velocity * self.time
 
-        # restringir o deslocamento
-        if deslocamento > 16:
-            deslocamento = 16
-        elif deslocamento < 0:
-            deslocamento -= 2
+        # restrict displacement
+        if displacement > 16:
+            displacement = 16
+        elif displacement < 0:
+            displacement -= 2
 
-        self.y += deslocamento
+        self.y += displacement
 
-        # o angulo do passaro
-        if deslocamento < 0 or self.y < (self.altura + 50):
-            if self.angulo < self.ROTACAO_MAXIMA:
-                self.angulo = self.ROTACAO_MAXIMA
+        # the bird's angle
+        if displacement < 0 or self.y < (self.height + 50):
+            if self.angle < self.MAX_ROTATION:
+                self.angle = self.MAX_ROTATION
         else:
-            if self.angulo > -90:
-                self.angulo -= self.VELOCIDADE_ROTACAO
+            if self.angle > -90:
+                self.angle -= self.ROTATION_VELOCITY
 
-    def desenhar(self, tela):
-        # definir qual imagem do passaro vai usar
-        self.contagem_imagem += 1
+    def draw(self, screen):
+        # select the bird image for animation
+        self.image_count += 1
 
-        if self.contagem_imagem < self.TEMPO_ANIMACAO:
-            self.imagem = self.IMGS[0]
-        elif self.contagem_imagem < self.TEMPO_ANIMACAO*2:
-            self.imagem = self.IMGS[1]
-        elif self.contagem_imagem < self.TEMPO_ANIMACAO*3:
-            self.imagem = self.IMGS[2]
-        elif self.contagem_imagem < self.TEMPO_ANIMACAO*4:
-            self.imagem = self.IMGS[1]
-        elif self.contagem_imagem >= self.TEMPO_ANIMACAO*4 + 1:
-            self.imagem = self.IMGS[0]
-            self.contagem_imagem = 0
+        if self.image_count < self.ANIMATION_TIME:
+            self.image = self.IMGS[0]
+        elif self.image_count < self.ANIMATION_TIME * 2:
+            self.image = self.IMGS[1]
+        elif self.image_count < self.ANIMATION_TIME * 3:
+            self.image = self.IMGS[2]
+        elif self.image_count < self.ANIMATION_TIME * 4:
+            self.image = self.IMGS[1]
+        elif self.image_count >= self.ANIMATION_TIME * 4 + 1:
+            self.image = self.IMGS[0]
+            self.image_count = 0
 
+        # if the bird is falling, don't flap wings
+        if self.angle <= -80:
+            self.image = self.IMGS[1]
+            self.image_count = self.ANIMATION_TIME * 2
 
-        # se o passaro tiver caindo eu não vou bater asa
-        if self.angulo <= -80:
-            self.imagem = self.IMGS[1]
-            self.contagem_imagem = self.TEMPO_ANIMACAO*2
-
-        # desenhar a imagem
-        imagem_rotacionada = pygame.transform.rotate(self.imagem, self.angulo)
-        pos_centro_imagem = self.imagem.get_rect(topleft=(self.x, self.y)).center
-        retangulo = imagem_rotacionada.get_rect(center=pos_centro_imagem)
-        tela.blit(imagem_rotacionada, retangulo.topleft)
+        # draw the bird image
+        rotated_image = pygame.transform.rotate(self.image, self.angle)
+        image_center = self.image.get_rect(topleft=(self.x, self.y)).center
+        rectangle = rotated_image.get_rect(center=image_center)
+        screen.blit(rotated_image, rectangle.topleft)
 
     def get_mask(self):
-        return pygame.mask.from_surface(self.imagem)
+        return pygame.mask.from_surface(self.image)
 
 
-class Cano:
-    DISTANCIA = 200
-    VELOCIDADE = 5
+class Pipe:
+    DISTANCE = 200
+    VELOCITY = 5
 
     def __init__(self, x):
         self.x = x
-        self.altura = 0
-        self.pos_topo = 0
-        self.pos_base = 0
-        self.CANO_TOPO = pygame.transform.flip(IMAGEM_CANO, False, True)
-        self.CANO_BASE = IMAGEM_CANO
-        self.passou = False
-        self.definir_altura()
+        self.height = 0
+        self.top_pos = 0
+        self.bottom_pos = 0
+        self.PIPE_TOP = pygame.transform.flip(PIPE_IMAGE, False, True)
+        self.PIPE_BOTTOM = PIPE_IMAGE
+        self.passed = False
+        self.set_height()
 
-    def definir_altura(self):
-        self.altura = random.randrange(50, 450)
-        self.pos_topo = self.altura - self.CANO_TOPO.get_height()
-        self.pos_base = self.altura + self.DISTANCIA
+    def set_height(self):
+        self.height = random.randrange(50, 450)
+        self.top_pos = self.height - self.PIPE_TOP.get_height()
+        self.bottom_pos = self.height + self.DISTANCE
 
-    def mover(self):
-        self.x -= self.VELOCIDADE
+    def move(self):
+        self.x -= self.VELOCITY
 
-    def desenhar(self, tela):
-        tela.blit(self.CANO_TOPO, (self.x, self.pos_topo))
-        tela.blit(self.CANO_BASE, (self.x, self.pos_base))
+    def draw(self, screen):
+        screen.blit(self.PIPE_TOP, (self.x, self.top_pos))
+        screen.blit(self.PIPE_BOTTOM, (self.x, self.bottom_pos))
 
-    def colidir(self, passaro):
-        passaro_mask = passaro.get_mask()
-        topo_mask = pygame.mask.from_surface(self.CANO_TOPO)
-        base_mask = pygame.mask.from_surface(self.CANO_BASE)
+    def collide(self, bird):
+        bird_mask = bird.get_mask()
+        top_mask = pygame.mask.from_surface(self.PIPE_TOP)
+        bottom_mask = pygame.mask.from_surface(self.PIPE_BOTTOM)
 
-        distancia_topo = (self.x - passaro.x, self.pos_topo - round(passaro.y))
-        distancia_base = (self.x - passaro.x, self.pos_base - round(passaro.y))
+        top_offset = (self.x - bird.x, self.top_pos - round(bird.y))
+        bottom_offset = (self.x - bird.x, self.bottom_pos - round(bird.y))
 
-        topo_ponto = passaro_mask.overlap(topo_mask, distancia_topo)
-        base_ponto = passaro_mask.overlap(base_mask, distancia_base)
+        top_point = bird_mask.overlap(top_mask, top_offset)
+        bottom_point = bird_mask.overlap(bottom_mask, bottom_offset)
 
-        if base_ponto or topo_ponto:
-            return True
-        else:
-            return False
+        return top_point or bottom_point
 
 
-class Chao:
-    VELOCIDADE = 5
-    LARGURA = IMAGEM_CHAO.get_width()
-    IMAGEM = IMAGEM_CHAO
+class Ground:
+    VELOCITY = 5
+    WIDTH = GROUND_IMAGE.get_width()
+    IMAGE = GROUND_IMAGE
 
     def __init__(self, y):
         self.y = y
         self.x1 = 0
-        self.x2 = self.LARGURA
+        self.x2 = self.WIDTH
 
-    def mover(self):
-        self.x1 -= self.VELOCIDADE
-        self.x2 -= self.VELOCIDADE
+    def move(self):
+        self.x1 -= self.VELOCITY
+        self.x2 -= self.VELOCITY
 
-        if self.x1 + self.LARGURA < 0:
-            self.x1 = self.x2 + self.LARGURA
-        if self.x2 + self.LARGURA < 0:
-            self.x2 = self.x1 + self.LARGURA
+        if self.x1 + self.WIDTH < 0:
+            self.x1 = self.x2 + self.WIDTH
+        if self.x2 + self.WIDTH < 0:
+            self.x2 = self.x1 + self.WIDTH
 
-    def desenhar(self, tela):
-        tela.blit(self.IMAGEM, (self.x1, self.y))
-        tela.blit(self.IMAGEM, (self.x2, self.y))
+    def draw(self, screen):
+        screen.blit(self.IMAGE, (self.x1, self.y))
+        screen.blit(self.IMAGE, (self.x2, self.y))
 
 
-def desenhar_tela(tela, passaros, canos, chao, pontos):
-    tela.blit(IMAGEM_BACKGROUND, (0, 0))
-    for passaro in passaros:
-        passaro.desenhar(tela)
-    for cano in canos:
-        cano.desenhar(tela)
+def draw_screen(screen, birds, pipes, ground, score):
+    screen.blit(BACKGROUND_IMAGE, (0, 0))
+    for bird in birds:
+        bird.draw(screen)
+    for pipe in pipes:
+        pipe.draw(screen)
 
-    texto = FONTE_PONTOS.render(f"Pontuação: {pontos}", 1, (255, 255, 255))
-    tela.blit(texto, (TELA_LARGURA - 10 - texto.get_width(), 10))
-    chao.desenhar(tela)
+    score_text = SCORE_FONT.render(f"Score: {score}", 1, (255, 255, 255))
+    screen.blit(score_text, (SCREEN_WIDTH - 10 - score_text.get_width(), 10))
+    ground.draw(screen)
     pygame.display.update()
 
 
-def main():
-    passaros = [Passaro(230, 350)]
-    chao = Chao(730)
-    canos = [Cano(700)]
-    tela = pygame.display.set_mode((TELA_LARGURA, TELA_ALTURA))
-    pontos = 0
-    relogio = pygame.time.Clock()
+def load_highscore():
+    try:
+        with open(HIGH_SCORE_FILE, 'r', encoding='utf-8') as file:
+            return int(file.read().strip() or 0)
+    except Exception:
+        return 0
 
-    rodando = True
-    while rodando:
-        relogio.tick(30)
 
-        # interação com o usuário
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                rodando = False
+def save_highscore(score, highscore):
+    if score > highscore:
+        with open(HIGH_SCORE_FILE, 'w', encoding='utf-8') as file:
+            file.write(str(score))
+        return score
+    return highscore
+
+
+def play_music(music_file, volume=0.5):
+    try:
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.stop()
+        pygame.mixer.music.load(music_file)
+        pygame.mixer.music.set_volume(volume)
+        pygame.mixer.music.play(-1)
+    except Exception:
+        pass
+
+
+def main_menu(screen, clock, highscore):
+    play_music(MENU_MUSIC_FILE)
+    options = ["Play", "Options", "Exit"]
+    selected = 0
+
+    while True:
+        clock.tick(30)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
-            if evento.type == pygame.KEYDOWN:
-                if evento.key == pygame.K_SPACE:
-                    for passaro in passaros:
-                        passaro.pular()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected = (selected - 1) % len(options)
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(options)
+                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    return options[selected]
 
-        # mover as coisas
-        for passaro in passaros:
-            passaro.mover()
-        chao.mover()
+        screen.blit(BACKGROUND_IMAGE, (0, 0))
+        title = SCORE_FONT.render("Flappy Bird", 1, (255, 255, 255))
+        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 100))
 
-        adicionar_cano = False
-        remover_canos = []
-        for cano in canos:
-            for i, passaro in enumerate(passaros):
-                if cano.colidir(passaro):
-                    passaros.pop(i)
-                if not cano.passou and passaro.x > cano.x:
-                    cano.passou = True
-                    adicionar_cano = True
-            cano.mover()
-            if cano.x + cano.CANO_TOPO.get_width() < 0:
-                remover_canos.append(cano)
+        for i, option in enumerate(options):
+            color = (255, 255, 0) if i == selected else (255, 255, 255)
+            text = MENU_FONT.render(option, 1, color)
+            screen.blit(text, (SCREEN_WIDTH // 2 - text.get_width() // 2, 250 + i * 60))
 
-        if adicionar_cano:
-            pontos += 1
-            canos.append(Cano(600))
-        for cano in remover_canos:
-            canos.remove(cano)
+        highscore_text = MENU_FONT.render(f"High Score: {highscore}", 1, (255, 255, 255))
+        screen.blit(highscore_text, (SCREEN_WIDTH // 2 - highscore_text.get_width() // 2, 180))
 
-        for i, passaro in enumerate(passaros):
-            if (passaro.y + passaro.imagem.get_height()) > chao.y or passaro.y < 0:
-                passaros.pop(i)
+        instructions = MENU_FONT.render("Use ↑ ↓ and Enter", 1, (255, 255, 255))
+        screen.blit(instructions, (SCREEN_WIDTH // 2 - instructions.get_width() // 2, 520))
 
-        desenhar_tela(tela, passaros, canos, chao, pontos)
+        pygame.display.update()
+
+
+def options_menu(screen, clock, sound_enabled):
+    play_music(MENU_MUSIC_FILE)
+    options = ["Sound", "Back"]
+    selected = 0
+
+    while True:
+        clock.tick(30)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected = (selected - 1) % len(options)
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(options)
+                elif event.key in (pygame.K_LEFT, pygame.K_RIGHT) and selected == 0:
+                    sound_enabled = not sound_enabled
+                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    if selected == 0:
+                        sound_enabled = not sound_enabled
+                    else:
+                        return sound_enabled
+                elif event.key == pygame.K_ESCAPE:
+                    return sound_enabled
+
+        screen.blit(BACKGROUND_IMAGE, (0, 0))
+        title = SCORE_FONT.render("Options", 1, (255, 255, 255))
+        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 100))
+
+        sound_status = "On" if sound_enabled else "Off"
+        options_text = [f"Sound: {sound_status}", "Back"]
+
+        for i, option in enumerate(options_text):
+            color = (255, 255, 0) if i == selected else (255, 255, 255)
+            text = MENU_FONT.render(option, 1, color)
+            screen.blit(text, (SCREEN_WIDTH // 2 - text.get_width() // 2, 250 + i * 60))
+
+        instructions = MENU_FONT.render("Use ← → to toggle", 1, (255, 255, 255))
+        screen.blit(instructions, (SCREEN_WIDTH // 2 - instructions.get_width() // 2, 520))
+
+        pygame.display.update()
+
+
+def play_game(screen, clock):
+    play_music(GAME_MUSIC_FILE)
+    birds = [Bird(230, 350)]
+    ground = Ground(730)
+    pipes = [Pipe(700)]
+    score = 0
+
+    while True:
+        clock.tick(30)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    for bird in birds:
+                        bird.jump()
+
+        for bird in birds:
+            bird.move()
+        ground.move()
+
+        add_pipe = False
+        remove_pipes = []
+        remove_birds = []
+        for pipe in pipes:
+            for bird in birds:
+                if pipe.collide(bird):
+                    remove_birds.append(bird)
+                if not pipe.passed and bird.x > pipe.x:
+                    pipe.passed = True
+                    add_pipe = True
+            pipe.move()
+            if pipe.x + pipe.PIPE_TOP.get_width() < 0:
+                remove_pipes.append(pipe)
+
+        for bird in remove_birds:
+            if bird in birds:
+                birds.remove(bird)
+
+        if add_pipe:
+            score += 1
+            pipes.append(Pipe(600))
+        for pipe in remove_pipes:
+            pipes.remove(pipe)
+
+        for bird in birds[:]:
+            if (bird.y + bird.image.get_height()) > ground.y or bird.y < 0:
+                birds.remove(bird)
+
+        if not birds:
+            return score
+
+        draw_screen(screen, birds, pipes, ground, score)
+
+
+def game_over(screen, clock, score, highscore):
+    play_music(MENU_MUSIC_FILE)
+    options = ["Play again", "Menu"]
+    selected = 0
+
+    while True:
+        clock.tick(30)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected = (selected - 1) % len(options)
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(options)
+                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    return options[selected]
+                elif event.key == pygame.K_ESCAPE:
+                    return "Menu"
+
+        screen.blit(BACKGROUND_IMAGE, (0, 0))
+        title = SCORE_FONT.render("Game Over", 1, (255, 0, 0))
+        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 100))
+
+        score_text = MENU_FONT.render(f"Final score: {score}", 1, (255, 255, 255))
+        screen.blit(score_text, (SCREEN_WIDTH // 2 - score_text.get_width() // 2, 200))
+
+        highscore_text = MENU_FONT.render(f"High Score: {highscore}", 1, (255, 255, 255))
+        screen.blit(highscore_text, (SCREEN_WIDTH // 2 - highscore_text.get_width() // 2, 240))
+
+        if score >= highscore:
+            new_record = MENU_FONT.render("New high score!", 1, (255, 255, 0))
+            screen.blit(new_record, (SCREEN_WIDTH // 2 - new_record.get_width() // 2, 280))
+
+        for i, option in enumerate(options):
+            color = (255, 255, 0) if i == selected else (255, 255, 255)
+            text = MENU_FONT.render(option, 1, color)
+            screen.blit(text, (SCREEN_WIDTH // 2 - text.get_width() // 2, 340 + i * 60))
+
+        instructions = MENU_FONT.render("Use ↑ ↓ and Enter", 1, (255, 255, 255))
+        screen.blit(instructions, (SCREEN_WIDTH // 2 - instructions.get_width() // 2, 520))
+
+        pygame.display.update()
+
+
+def main():
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption('Flappy Bird')
+    clock = pygame.time.Clock()
+    sound_enabled = True
+
+    highscore = load_highscore()
+
+    while True:
+        choice = main_menu(screen, clock, highscore)
+        if choice == "Play":
+            while True:
+                score = play_game(screen, clock)
+                highscore = save_highscore(score, highscore)
+                result = game_over(screen, clock, score, highscore)
+                if result == "Play again":
+                    continue
+                break
+        elif choice == "Options":
+            sound_enabled = options_menu(screen, clock, sound_enabled)
+        else:
+            break
+
+    pygame.quit()
+    quit()
 
 
 if __name__ == '__main__':
